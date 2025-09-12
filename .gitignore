@@ -1,0 +1,6 @@
+.idea/
+apps/web/.next/cache/webpack/server-development/7.pack.gz
+apps/web/.next/cache/webpack/
+apps/web/.next/
+apps/web/node_modules/
+node_modules/
