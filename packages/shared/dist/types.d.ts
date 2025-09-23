@@ -36,6 +36,14 @@ export interface RefreshTokenRequest {
     refreshToken: string;
     deviceId: string;
 }
+export interface RefreshTokenResponse {
+    accessToken: string | null;
+    refreshToken: string | null;
+    expiresAt: number | null;
+    success: boolean;
+    user: User | null;
+    biometricEligible: boolean | null;
+}
 export interface ApiResponse<T> {
     success: boolean;
     data?: T;

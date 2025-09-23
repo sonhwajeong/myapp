@@ -1,8 +1,10 @@
 'use client'
 
-import { useState, FormEvent } from 'react'
+import { useState, FormEvent, useEffect } from 'react'
 import { apiClient } from '@myapp/shared'
 import { LoginRequest } from '@myapp/shared'
+import { setAccessTokenCookie, setRefreshTokenCookie, setUserInfoCookie, clearTokenCookies } from '../../utils/cookies'
+import { getCurrentUserInfo, isLoggedIn } from '../../utils/auth'
 
 export default function LoginPage() {
   const [formData, setFormData] = useState<LoginRequest>({
@@ -17,13 +19,28 @@ export default function LoginPage() {
   const [user, setUser] = useState<any>(null)
 
   // URL에서 redirect 파라미터 확인
-  const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
-  const redirectPath = urlParams?.get('redirect') || '/'
-  
-  console.log('로그인 페이지 로드:', {
-    redirectPath,
-    fullUrl: typeof window !== 'undefined' ? window.location.href : 'SSR'
-  });
+  const [redirectPath, setRedirectPath] = useState('/')
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      const redirect = urlParams.get('redirect') || '/'
+      setRedirectPath(redirect)
+      console.log('로그인 페이지 로드:', {
+        redirectPath: redirect,
+        fullUrl: window.location.href
+      })
+     
+      // 이미 로그인되어 있는지 확인 (쿠키/localStorage에서)
+      if (isLoggedIn()) {
+        const userInfo = getCurrentUserInfo()
+        if (userInfo) {
+         // alert('🍪 Already logged in, showing user info from storage:' + userInfo)
+          setUser(userInfo)
+        }
+      }
+    }
+  }, [])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -35,20 +52,25 @@ export default function LoginPage() {
       
       if (result.success) {
         console.log('로그인 성공:', result);
-        
+
+        // 웹에서는 쿠키에만 토큰과 사용자 정보 저장
+        setAccessTokenCookie(result.accessToken);
+        setRefreshTokenCookie(result.refreshToken);
+        setUserInfoCookie(result.user);
+
         // 디버깅용 WebView 환경 확인
         console.log('WebView 환경 확인:', {
           ReactNativeWebView: !!window.ReactNativeWebView,
           onLoginSuccess: typeof window.onLoginSuccess,
           userAgent: navigator.userAgent
         });
-        
-        // 웹→앱 브리지: 로그인 성공시 앱에 토큰 전달
+
+        // 웹→앱 브리지: 로그인 성공시 앱에 토큰과 사용자 정보 전달
         if (window.onLoginSuccess) {
-          console.log('onLoginSuccess 함수 호출');
-          window.onLoginSuccess(result.accessToken, result.refreshToken);
+          console.log('onLoginSuccess 함수 호출 - 사용자 정보 포함:', result.user);
+          window.onLoginSuccess(result.accessToken, result.refreshToken, result.user);
         }
-        
+
         // postMessage API로도 전달
         if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
           console.log('ReactNativeWebView postMessage 사용');
@@ -59,7 +81,7 @@ export default function LoginPage() {
             user: result.user
           }));
         }
-        
+
         // 성공 화면 표시
         setUser(result.user);
       } else {
@@ -70,31 +92,6 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false);
     }
-  }
-
-  if (user) {
-    return (
-      <div style={styles.container}>
-        <div style={styles.successCard}>
-          <h1>로그인 성공!</h1>
-          <div style={styles.userInfo}>
-            <p><strong>이름:</strong> {user.name}</p>
-            <p><strong>이메일:</strong> {user.email}</p>
-            <p><strong>역할:</strong> {user.role}</p>
-          </div>
-          <button 
-            onClick={() => {
-              setUser(null)
-              localStorage.removeItem('accessToken')
-              localStorage.removeItem('refreshToken')
-            }}
-            style={styles.logoutButton}
-          >
-            로그아웃
-          </button>
-        </div>
-      </div>
-    )
   }
 
   return (

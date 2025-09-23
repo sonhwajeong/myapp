@@ -60,4 +60,4 @@ export class ApiClient {
   }
 }
 
-export const apiClient = new ApiClient('http://172.16.2.84:8080');
+export const apiClient = new ApiClient(process.env.NEXT_PUBLIC_API_URL || 'http://172.16.2.84:8080');

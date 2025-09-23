@@ -8,19 +8,28 @@ export default function Home() {
 
   return (
     <main style={{ padding: '20px' }}>
-      <h1>MyApp Web</h1>
-      <p>Welcome to the web application!</p>
+      <h1>MyApp</h1>
       
-      <div style={{ margin: '20px 0' }}>
-        <Link href="/login" style={{ 
-          backgroundColor: '#007bff', 
-          color: 'white', 
-          padding: '10px 20px', 
-          textDecoration: 'none', 
+      <div style={{ margin: '20px 0', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+        <Link href="/login" style={{
+          backgroundColor: '#007bff',
+          color: 'white',
+          padding: '10px 20px',
+          textDecoration: 'none',
           borderRadius: '4px',
           display: 'inline-block'
         }}>
           로그인
+        </Link>
+        <Link href="/news" style={{
+          backgroundColor: '#28a745',
+          color: 'white',
+          padding: '10px 20px',
+          textDecoration: 'none',
+          borderRadius: '4px',
+          display: 'inline-block'
+        }}>
+          📰 새로운 소식
         </Link>
       </div>
       

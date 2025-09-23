@@ -8,7 +8,6 @@ This is a TypeScript monorepo using npm workspaces and Turbo for build orchestra
 
 - **apps/web**: Next.js web application (`@myapp/web`)
 - **apps/app**: Expo/React Native mobile application
-- **apps/app-backup**: Backup mobile application
 - **packages/shared**: Shared TypeScript library (`@myapp/shared`)
 
 The shared package is consumed by the web application and provides common utilities and types across the platform.
@@ -20,7 +19,7 @@ The shared package is consumed by the web application and provides common utilit
 - `npm run dev:web`: Start the Next.js web app in development mode
 - `npm run build`: Build all apps and packages (shared → web → app)
 - `npm run build:shared`: Build only the shared package
-- `npm run build:web`: Build only the web application  
+- `npm run build:web`: Build only the web application
 - `npm run build:app`: Build only the mobile application
 - `npm run lint`: Run linting across all packages and apps
 
@@ -34,7 +33,7 @@ The shared package is consumed by the web application and provides common utilit
 ### Mobile App (apps/app)
 - `cd apps/app && npm run start`: Start Expo development server
 - `cd apps/app && npm run android`: Run on Android
-- `cd apps/app && npm run ios`: Run on iOS  
+- `cd apps/app && npm run ios`: Run on iOS
 - `cd apps/app && npm run web`: Run Expo web version
 
 ### Shared Package (packages/shared)
@@ -61,7 +60,7 @@ The project uses TypeScript project references for efficient builds:
 ## Key Technologies
 
 - **Web**: Next.js 14.0.4, React 18, TypeScript
-- **Mobile**: Expo ~53.0.22, React Native 0.79.5, React 19.0.0, React Navigation 7.x, Firebase
+- **Mobile**: Expo ~53.0.22, React Native 0.79.5, React 19.0.0, React Navigation 7.x, Firebase 12.2.1
 - **Shared**: Pure TypeScript library
 - **Build System**: Turbo, npm workspaces
 - **Development**: TypeScript 5.x, ESLint
@@ -72,7 +71,7 @@ The project uses TypeScript project references for efficient builds:
 - **Entry Point**: `apps/app/index.js` → `apps/app/App.js` → `apps/app/src/App.tsx`
 - **Navigation**: Uses React Navigation 7.x with bottom tabs (`@react-navigation/bottom-tabs`)
 - **Navigation Components**: Located in `apps/app/src/navigation/` (RootTabs)
-- **Firebase Integration**: Firebase v12.2.1 for backend services
+- **Firebase Integration**: Firebase 12.2.1 for backend services
 
 ### Shared Package Structure
 - **Source**: `packages/shared/src/` with `api.ts`, `types.ts`, `utils.ts`, `index.ts`
@@ -98,7 +97,7 @@ The project uses TypeScript project references for efficient builds:
   - `root = file("../")` (not `../../`)
 
 ### Troubleshooting Commands
-- Clear Metro cache: `cd apps/app && npx expo start --clear`  
+- Clear Metro cache: `cd apps/app && npx expo start --clear`
 - Reset React Native cache: `cd apps/app && npx react-native start --reset-cache`
 - Clean build: `cd apps/app && rm -rf node_modules && npm install`
 
@@ -125,6 +124,29 @@ npx expo start --clear      # Clear Metro cache
 npm run build:app           # Builds the app (cd apps/app && npm run build)
 npm run lint:app            # Lints the app (cd apps/app && npm run lint)
 ```
+
+## Configuration Details
+
+### Turbo Build Pipeline
+- **Build Dependencies**: Shared package must build before apps (`"dependsOn": ["^build"]`)
+- **Output Directories**: `.next/**`, `dist/**`, `build/**`
+- **Development**: `dev` tasks use `"cache": false` and `"persistent": true`
+
+### Metro Configuration (Mobile App)
+- **Monorepo Support**: Watches entire workspace root for changes
+- **Module Resolution**: Resolves from both app and workspace node_modules
+- **Shared Package Alias**: `@myapp/shared` → `packages/shared/src`
+- **Hierarchical Lookup**: Disabled for better monorepo support
+
+### Next.js Configuration (Web App)
+- **Transpile Packages**: Configured to transpile `@myapp/shared`
+- **External Directory**: Enabled for monorepo support
+- **CORS Headers**: Configured for all routes with permissive settings
+
+### TypeScript Project References
+- **Root Config**: References all workspace packages with Expo base config
+- **Shared Package**: Outputs declaration files to `dist/`
+- **Web App**: Uses Next.js TypeScript plugin with path mapping
 
 ## Testing
 

@@ -21,7 +21,7 @@ export default function SSOPage() {
         }
 
         // 토큰 검증
-        const response = await fetch('http://127.16.2.84:8080/auth/check', {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://172.16.2.84:8080'}/auth/check`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

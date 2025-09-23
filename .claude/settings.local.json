@@ -21,7 +21,9 @@
       "Bash(npx:*)",
       "Bash(npm update:*)",
       "Bash(npm ls:*)",
-      "Bash(NODE_ENV=production ./gradlew assembleRelease)"
+      "Bash(NODE_ENV=production ./gradlew assembleRelease)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)"
     ],
     "deny": [],
     "ask": []
