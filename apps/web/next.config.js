@@ -22,6 +22,21 @@ const nextConfig = {
             key: 'Access-Control-Allow-Headers',
             value: 'Content-Type, Authorization',
           },
+          // 🔧 웹뷰 관련 헤더 추가
+          {
+            key: 'X-Frame-Options',
+            value: 'SAMEORIGIN',
+          },
+          // 🔧 보안 헤더 수정 - 웹뷰에서 스크립트 실행 허용
+          {
+            key: 'Content-Security-Policy',
+            value: "frame-ancestors 'self' *; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://dapi.kakao.com https://t1.daumcdn.net http://t1.daumcdn.net; object-src 'none'; connect-src 'self' * https://dapi.kakao.com https://t1.daumcdn.net http://t1.daumcdn.net;",
+          },
+          // 🔧 웹뷰에서 쿠키 사용 허용
+          {
+            key: 'Set-Cookie',
+            value: 'SameSite=None; Secure',
+          },
         ],
       },
     ]

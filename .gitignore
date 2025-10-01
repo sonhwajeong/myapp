@@ -1,6 +1,47 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# production
+/build
+
+# misc
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 🔧 Android Keystore (보안 중요!)
+*.keystore
+*.jks
+!debug.keystore
+keystore.properties
+release-key.properties
+
+# 🔧 Android 빌드 출력
+apps/app/android/app/build/
+apps/app/android/.gradle/
+apps/app/android/local.properties
+
+# 🔧 임시 파일
+*.log
+*.tmp
+.cache/
+
+# 🔧 IDE 설정
 .idea/
-apps/web/.next/cache/webpack/server-development/7.pack.gz
-apps/web/.next/cache/webpack/
-apps/web/.next/
-apps/web/node_modules/
-node_modules/
+.vscode/
+*.swp
+*.swo
+*~

@@ -86,7 +86,17 @@ export default function CartPage() {
       alert('장바구니에 상품이 없습니다.')
       return
     }
-    setShowSignatureModal(true)
+
+    // 앱 환경에서는 네이티브 서명 화면으로 이동
+    if (isAppContext && (window as any).ReactNativeWebView) {
+      (window as any).ReactNativeWebView.postMessage(JSON.stringify({
+        type: 'CHECKOUT_REQUEST',
+        cartData: cartData
+      }));
+    } else {
+      // 웹 환경에서는 기존 서명 모달 사용
+      setShowSignatureModal(true)
+    }
   }
 
   const handleSignatureSave = async (signature: string) => {
@@ -325,7 +335,7 @@ const styles = {
     wordBreak: 'break-word' as const,
     overflow: 'hidden',
     display: '-webkit-box',
-    WebkitBoxOrient: 'vertical',
+    WebkitBoxOrient: 'vertical' as const,
     WebkitLineClamp: 2,
   },
   priceInfo: {

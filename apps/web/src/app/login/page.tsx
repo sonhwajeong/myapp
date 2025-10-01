@@ -60,15 +60,15 @@ export default function LoginPage() {
 
         // 디버깅용 WebView 환경 확인
         console.log('WebView 환경 확인:', {
-          ReactNativeWebView: !!window.ReactNativeWebView,
-          onLoginSuccess: typeof window.onLoginSuccess,
+          ReactNativeWebView: !!(window as any).ReactNativeWebView,
+          onLoginSuccess: typeof (window as any).onLoginSuccess,
           userAgent: navigator.userAgent
         });
 
         // 웹→앱 브리지: 로그인 성공시 앱에 토큰과 사용자 정보 전달
-        if (window.onLoginSuccess) {
+        if ((window as any).onLoginSuccess) {
           console.log('onLoginSuccess 함수 호출 - 사용자 정보 포함:', result.user);
-          window.onLoginSuccess(result.accessToken, result.refreshToken, result.user);
+          (window as any).onLoginSuccess(result.accessToken, result.refreshToken, result.user);
         }
 
         // postMessage API로도 전달

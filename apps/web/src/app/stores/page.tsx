@@ -31,7 +31,10 @@ export default function StoresPage() {
   const [selectedStore, setSelectedStore] = useState<Store | null>(null)
   const [mapLoading, setMapLoading] = useState(true)
   const [mapError, setMapError] = useState<string | null>(null)
+  const [isLocationLoading, setIsLocationLoading] = useState(false)
+  const [isMyLocationSelected, setIsMyLocationSelected] = useState(false)
   const mapContainer = useRef<HTMLDivElement>(null)
+
 
   // 샘플 매장 데이터 (실제 서비스에서는 API로 받아올 데이터)
   const sampleStores: Store[] = [
@@ -70,13 +73,128 @@ export default function StoresPage() {
     }
   ]
 
+
+  // 📍 내 위치 버튼 클릭 시 위치 가져오기
+  const handleMyLocationClick = async () => {
+    if (!map) {
+      alert('지도가 아직 로드되지 않았습니다. 잠시 후 다시 시도해주세요.')
+      return
+    }
+
+    setIsLocationLoading(true)
+
+    const hasReactNativeWebView = !!(window as any).ReactNativeWebView
+    const hasGetAppLocation = !!(window as any).getAppLocation
+    const isCurrentlyInApp = hasReactNativeWebView || hasGetAppLocation
+
+    if (isCurrentlyInApp && (window as any).getAppLocation) {
+      try {
+
+        // Promise with timeout
+        const locationPromise = (window as any).getAppLocation()
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('30초 타임아웃')), 30000)
+        })
+
+        const appLocation = await Promise.race([locationPromise, timeoutPromise])
+
+        // Alert로 원본 데이터 먼저 표시
+        //alert(`📱 앱에서 받은 데이터:\n\n${JSON.stringify(appLocation, null, 2)}`)
+
+        // 🎯 검증을 매우 관대하게 처리
+        let lat = null
+        let lng = null
+
+        // 다양한 형태의 데이터 구조 지원
+        try {
+          if (appLocation) {
+            // 경우 1: {latitude: 37.123, longitude: 127.123}
+            if (appLocation.latitude && appLocation.longitude) {
+              lat = Number(appLocation.latitude)
+              lng = Number(appLocation.longitude)
+            }
+            // 경우 2: {lat: 37.123, lng: 127.123}
+            else if (appLocation.lat && appLocation.lng) {
+              lat = Number(appLocation.lat)
+              lng = Number(appLocation.lng)
+            }
+            // 경우 3: {coords: {latitude: 37.123, longitude: 127.123}}
+            else if (appLocation.coords && appLocation.coords.latitude && appLocation.coords.longitude) {
+              lat = Number(appLocation.coords.latitude)
+              lng = Number(appLocation.coords.longitude)
+            }
+            // 경우 4: 문자열로 온 경우 파싱
+            else if (typeof appLocation === 'string') {
+              const parsed = JSON.parse(appLocation)
+              lat = Number(parsed.latitude || parsed.lat)
+              lng = Number(parsed.longitude || parsed.lng)
+            }
+          }
+
+
+          // 좌표가 유효한 숫자인지만 확인
+          if (lat && lng && !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+            const locPosition = new window.kakao.maps.LatLng(lat, lng)
+
+            setCurrentLocation({ lat, lng })
+
+            // 매장 선택 해제하고 내 위치 선택 상태로 변경
+            setSelectedStore(null)
+            setIsMyLocationSelected(true)
+
+            // 매장 선택하는 것처럼 지도 중심을 내 위치로 이동
+            map.setCenter(locPosition)
+            map.setLevel(4) // 매장과 동일한 확대 레벨
+
+            // 내 위치 마커 생성
+            const marker = new window.kakao.maps.Marker({
+              position: locPosition,
+              title: '📍 내 현재 위치'
+            })
+            marker.setMap(map)
+
+            // 내 위치 정보창
+            const infoWindow = new window.kakao.maps.InfoWindow({
+              content: `
+                <div style="padding:12px;font-size:12px;text-align:center;min-width:200px;">
+                  <div style="font-weight:bold;margin-bottom:5px;color:red;">📍 내 현재 위치</div>
+                  <div style="color:#007bff;font-family:monospace;">
+                    위도: ${lat.toFixed(6)}<br/>
+                    경도: ${lng.toFixed(6)}
+                  </div>
+                  <div style="color:#666;font-size:10px;">소스: 앱</div>
+                </div>
+              `
+            })
+            infoWindow.open(map, marker)
+           // alert(`📍 내 위치로 이동!\n\n위도: ${lat.toFixed(6)}\n경도: ${lng.toFixed(6)}`)
+
+          } else {
+            alert(`❌ 좌표를 추출할 수 없습니다.\n\nlat=${lat}, lng=${lng}\n\n원본: ${JSON.stringify(appLocation)}`)
+          }
+
+        } catch (parseError) {
+          alert(`❌ 데이터 파싱 실패: ${parseError}`)
+        }
+
+      } catch (error) {
+        alert(`❌ 위치 정보를 가져올 수 없습니다.\n\n에러: ${error}\n\n앱에서 위치 권한을 확인해주세요.`)
+      }
+    } else {
+      alert('❌ 앱에서만 위치 서비스를 사용할 수 있습니다.')
+    }
+
+    setIsLocationLoading(false)
+  }
+
   useEffect(() => {
     // 쿠키와 WebView 컨텍스트 확인
     if (typeof window !== 'undefined') {
       const hasReactNativeWebView = !!(window as any).ReactNativeWebView
       const hasGetAppToken = !!(window as any).getAppToken
+      const hasGetAppLocation = !!(window as any).getAppLocation
 
-      setIsAppContext(hasReactNativeWebView || hasGetAppToken)
+      setIsAppContext(hasReactNativeWebView || hasGetAppToken || hasGetAppLocation)
 
       // 쿠키에서 토큰 가져오기
       const cookieToken = getCurrentAccessToken()
@@ -97,43 +215,14 @@ export default function StoresPage() {
         loadToken()
       }
 
-      console.log('🗺️ Stores page loaded:', {
-        isWebView: hasReactNativeWebView,
-        hasCookieToken: !!cookieToken,
-        hasAppTokenFunction: hasGetAppToken
-      })
-
-      // 현재 호스트 확인 후 적절한 지도 로딩 방식 선택
-      const currentHost = window.location.hostname
-      const currentOrigin = window.location.origin
-      console.log('현재 호스트:', currentHost)
-      console.log('현재 오리진:', currentOrigin)
-      console.log('WebView 환경:', hasReactNativeWebView || hasGetAppToken)
-
-      // WebView 환경이거나 localhost/127.0.0.1/내부 IP에서는 카카오 지도 로드 시도
-      if (hasReactNativeWebView || hasGetAppToken ||
-          currentHost === 'localhost' ||
-          currentHost === '127.0.0.1' ||
-          currentHost.startsWith('192.168.') ||
-          currentHost.startsWith('10.') ||
-          currentHost.startsWith('172.')) {
-
-        console.log('🗺️ 카카오 지도 로드 시도 (WebView 또는 로컬 환경)');
-        loadKakaoMapScript()
-      } else {
-        // 기타 환경에서는 대체 지도 방식 사용
-        console.log('🔄 대체 지도 방식 사용');
-        loadAlternativeMap()
-      }
+      // 항상 카카오 지도 로드를 시도하도록 변경
+      loadKakaoMapScript()
     }
   }, [])
 
   const loadKakaoMapScript = () => {
-    console.log('카카오 지도 스크립트 로드 시작')
-
     // 이미 카카오 지도가 로드되어 있는지 확인
     if (window.kakao && window.kakao.maps) {
-      console.log('카카오 지도 이미 로드됨')
       initializeKakaoMap()
       return
     }
@@ -150,103 +239,61 @@ export default function StoresPage() {
     script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=0b4d7ca853d21021a6fee701aab68d7a&autoload=false`
 
     script.onload = () => {
-      console.log('카카오 지도 스크립트 로드 완료')
       // autoload=false이므로 수동으로 load 호출
       window.kakao.maps.load(() => {
-        console.log('카카오 지도 SDK 초기화 완료')
         initializeKakaoMap()
       })
     }
 
     script.onerror = (error) => {
-      console.error('카카오 지도 스크립트 로드 실패:', error)
-      console.log('📋 WebView 환경 문제 해결 체크리스트:')
-      console.log('1. API 키가 올바른지 확인: 0b4d7ca853d21021a6fee701aab68d7a')
-      console.log('2. 카카오 개발자 콘솔에서 웹 플랫폼 등록 확인')
-      console.log('3. 사이트 도메인에 다음 도메인들이 등록되었는지 확인:')
-      console.log('   - http://localhost:3000')
-      console.log('   - http://127.0.0.1:3000')
-      console.log(`   - ${window.location.origin} (현재 접근 도메인)`)
-      console.log('4. JavaScript 키 활성화 상태 확인')
-      console.log('5. 카카오맵 API 서비스 활성화 확인')
-      console.log('6. WebView 환경에서의 CORS 설정 확인')
-
-      // WebView 환경이면 대체 지도로 전환
-      if ((window as any).ReactNativeWebView || (window as any).getAppToken) {
-        console.log('🔄 WebView 환경에서 지도 로드 실패 - 대체 지도로 전환')
-        loadAlternativeMap()
-        return
-      }
-
-      setMapError('지도를 로드할 수 없습니다. 개발자 도구 콘솔을 확인해주세요.')
+      console.error('카카오 지도 로드 실패:', error)
+      setMapError('카카오 지도를 로드할 수 없습니다. 네트워크 연결 및 API 키를 확인해주세요.')
       setMapLoading(false)
     }
 
     document.head.appendChild(script)
   }
 
-  const loadAlternativeMap = () => {
-    console.log('대체 지도 방식으로 초기화 (내부 IP 환경)')
-    setMapLoading(false)
-    setNearbyStores(sampleStores)
 
-    // 현재 위치만 가져오기 (거리 계산용)
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const lat = position.coords.latitude
-          const lng = position.coords.longitude
-          setCurrentLocation({ lat, lng })
-          console.log('현재 위치 확인:', lat, lng)
-        },
-        (error) => {
-          console.error('현재 위치를 가져올 수 없습니다:', error)
-        }
-      )
-    }
-  }
-
-  const initializeKakaoMap = () => {
-    console.log('카카오 지도 초기화 시작')
-
+  const initializeKakaoMap = async () => {
     if (!mapContainer.current) {
-      console.error('지도 컨테이너를 찾을 수 없습니다')
       setMapError('지도 컨테이너 오류')
       setMapLoading(false)
       return
     }
 
     if (!window.kakao || !window.kakao.maps) {
-      console.error('카카오 지도 객체가 없습니다')
       setMapError('카카오 지도 라이브러리 로드 실패')
       setMapLoading(false)
       return
     }
 
     try {
-      // 지도 옵션 설정
+      // 항상 서울시청 중심으로 지도 생성
+      const initialCenter = new window.kakao.maps.LatLng(37.5665, 126.9780); // 서울시청
+      const initialLevel = 8;
+
       const mapOption = {
-        center: new window.kakao.maps.LatLng(37.5665, 126.9780), // 서울시청
-        level: 8 // 지도 확대 레벨
+        center: initialCenter,
+        level: initialLevel
       }
 
-      // 지도 생성
       const kakaoMap = new window.kakao.maps.Map(mapContainer.current, mapOption)
       setMap(kakaoMap)
-      console.log('카카오 지도 생성 완료')
 
-      // 지도 크기 재조정 (컨테이너 크기에 맞게)
+      // 지도 크기 재조정
       setTimeout(() => {
         kakaoMap.relayout()
-        console.log('지도 크기 재조정 완료')
       }, 100)
 
-      // 현재 위치 가져오기
-      getCurrentPosition(kakaoMap)
+      setTimeout(() => {
+        kakaoMap.relayout()
+      }, 500)
 
       // 매장 마커 표시
       displayStores(kakaoMap, sampleStores)
       setNearbyStores(sampleStores)
+
       setMapLoading(false)
 
     } catch (error) {
@@ -256,38 +303,6 @@ export default function StoresPage() {
     }
   }
 
-  const getCurrentPosition = (kakaoMap: any) => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const lat = position.coords.latitude
-          const lng = position.coords.longitude
-          const locPosition = new window.kakao.maps.LatLng(lat, lng)
-
-          setCurrentLocation({ lat, lng })
-
-          // 현재 위치 마커 표시
-          const marker = new window.kakao.maps.Marker({
-            position: locPosition
-          })
-          marker.setMap(kakaoMap)
-
-          // 현재 위치로 지도 중심 이동
-          kakaoMap.setCenter(locPosition)
-          kakaoMap.setLevel(6)
-
-          // 현재 위치 정보창
-          const infoWindow = new window.kakao.maps.InfoWindow({
-            content: '<div style="padding:10px;font-size:12px;text-align:center;">현재 위치</div>'
-          })
-          infoWindow.open(kakaoMap, marker)
-        },
-        (error) => {
-          console.error('현재 위치를 가져올 수 없습니다:', error)
-        }
-      )
-    }
-  }
 
   const displayStores = (kakaoMap: any, stores: Store[]) => {
     stores.forEach(store => {
@@ -390,67 +405,34 @@ export default function StoresPage() {
               </button>
             </div>
           )}
-          {/* 실제 카카오 지도 (localhost에서만) */}
+          {/* 카카오 지도 컨테이너 */}
           <div
             ref={mapContainer}
             style={{
               ...styles.map,
-              display: mapLoading || mapError || !map ? 'none' : 'block'
+              display: mapLoading || mapError ? 'none' : 'block'
             }}
           ></div>
-
-          {/* 대체 지도 화면 (내부 IP 환경) */}
-          {!mapLoading && !mapError && !map && (
-            <div style={styles.alternativeMap}>
-              <div style={styles.mapInfo}>
-                <h3 style={styles.mapTitle}>🗺️ 매장 위치 안내</h3>
-                <p style={styles.mapDescription}>
-                  개발 환경에서는 지도를 직접 표시할 수 없습니다.<br />
-                  아래 매장 목록에서 매장을 선택하면 카카오맵으로 연결됩니다.
-                </p>
-                <div style={styles.mapButtons}>
-                  {currentLocation && (
-                    <button
-                      onClick={() => {
-                        const url = `https://map.kakao.com/link/search/MyApp 매장`
-                        if (typeof window !== 'undefined') {
-                          if ((window as any).ReactNativeWebView) {
-                            window.location.href = url
-                          } else {
-                            window.open(url, '_blank')
-                          }
-                        }
-                      }}
-                      style={styles.mapButton}
-                    >
-                      🔍 근처 매장 찾기
-                    </button>
-                  )}
-                  <button
-                    onClick={() => {
-                      const url = `https://map.kakao.com/link/search/서울 매장`
-                      if (typeof window !== 'undefined') {
-                        if ((window as any).ReactNativeWebView) {
-                          window.location.href = url
-                        } else {
-                          window.open(url, '_blank')
-                        }
-                      }
-                    }}
-                    style={styles.mapButton}
-                  >
-                    🗺️ 카카오맵으로 보기
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         <div style={styles.storeList}>
-          <h3 style={styles.listTitle}>
-            {currentLocation ? '가까운 매장' : '매장 목록'}
-          </h3>
+          <div style={styles.listHeader}>
+            <h3 style={styles.listTitle}>
+              {currentLocation ? '가까운 매장' : '매장 목록'}
+            </h3>
+
+            {/* 내 위치 버튼 */}
+            <button
+              style={{
+                ...styles.myLocationButton,
+                ...(isLocationLoading ? styles.myLocationButtonLoading : {})
+              }}
+              onClick={handleMyLocationClick}
+              disabled={isLocationLoading || mapLoading}
+            >
+              {isLocationLoading ? '⏳' : '📍'} 내 위치
+            </button>
+          </div>
 
           {getStoresWithDistance().map((store) => (
             <div
@@ -461,11 +443,11 @@ export default function StoresPage() {
               }}
               onClick={() => {
                 setSelectedStore(store)
+                setIsMyLocationSelected(false) // 매장 선택 시 내 위치 선택 해제
                 if (map && window.kakao && window.kakao.maps) {
                   const position = new window.kakao.maps.LatLng(store.latitude, store.longitude)
                   map.setCenter(position)
                   map.setLevel(4)
-                  console.log(`지도 중심을 ${store.name}으로 이동`)
                 }
               }}
             >
@@ -487,6 +469,7 @@ export default function StoresPage() {
           ))}
         </div>
       </div>
+
 
       {selectedStore && (
         <div style={styles.selectedStoreInfo}>
@@ -512,6 +495,35 @@ export default function StoresPage() {
                 }}
               >
                 길찾기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 내 위치 선택 시 정보 표시 */}
+      {isMyLocationSelected && currentLocation && (
+        <div style={styles.selectedLocationInfo}>
+          <div style={styles.selectedStoreContent}>
+            <h4 style={styles.selectedStoreName}>📍 내 현재 위치</h4>
+            <div style={styles.locationDetails}>
+
+            </div>
+            <div style={styles.actionButtons}>
+              <button
+                style={styles.directionsButton}
+                onClick={() => {
+                  const url = `https://map.kakao.com/link/map/내위치,${currentLocation.lat},${currentLocation.lng}`
+                  window.open(url, '_blank')
+                }}
+              >
+                카카오맵에서 보기
+              </button>
+              <button
+                style={styles.callButton}
+                onClick={() => setIsMyLocationSelected(false)}
+              >
+                선택 해제
               </button>
             </div>
           </div>
@@ -556,12 +568,35 @@ const styles = {
     borderTop: '1px solid #ddd',
     padding: '15px',
   },
+  listHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '15px',
+  },
   listTitle: {
     fontSize: '18px',
     fontWeight: 'bold',
-    marginBottom: '15px',
     color: '#333',
-    margin: '0 0 15px 0',
+    margin: '0',
+  },
+  myLocationButton: {
+    backgroundColor: '#007bff',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    padding: '8px 12px',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+  },
+  myLocationButtonLoading: {
+    backgroundColor: '#6c757d',
+    cursor: 'not-allowed',
   },
   storeCard: {
     border: '1px solid #ddd',
@@ -573,7 +608,7 @@ const styles = {
     backgroundColor: 'white',
   },
   selectedStore: {
-    borderColor: '#007bff',
+    border: '2px solid #007bff',
     backgroundColor: '#f0f7ff',
   },
   storeHeader: {
@@ -624,6 +659,23 @@ const styles = {
     color: 'white',
     padding: '15px',
     borderTop: '1px solid #0056b3',
+  },
+  selectedLocationInfo: {
+    backgroundColor: '#28a745',
+    color: 'white',
+    padding: '15px',
+    borderTop: '1px solid #1e7e34',
+  },
+  locationDetails: {
+    marginBottom: '10px',
+  },
+  locationCoords: {
+    fontSize: '12px',
+    fontFamily: 'monospace',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    padding: '4px 8px',
+    borderRadius: '4px',
+    display: 'inline-block',
   },
   selectedStoreContent: {
     display: 'flex',
@@ -688,49 +740,5 @@ const styles = {
     borderRadius: '4px',
     cursor: 'pointer',
     fontSize: '14px',
-  },
-  mapInfo: {
-    textAlign: 'center' as const,
-    padding: '20px',
-  },
-  mapTitle: {
-    fontSize: '24px',
-    fontWeight: 'bold',
-    margin: '0 0 15px 0',
-    color: '#333',
-  },
-  mapDescription: {
-    fontSize: '14px',
-    color: '#666',
-    lineHeight: '1.5',
-    margin: '0 0 20px 0',
-  },
-  mapButtons: {
-    display: 'flex',
-    gap: '10px',
-    justifyContent: 'center',
-    flexWrap: 'wrap' as const,
-  },
-  mapButton: {
-    padding: '10px 20px',
-    backgroundColor: '#FEE500',
-    color: '#000',
-    border: 'none',
-    borderRadius: '6px',
-    fontSize: '14px',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-  },
-  alternativeMap: {
-    width: '100%',
-    height: '100%',
-    minHeight: '300px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f8f9fa',
-    border: '2px dashed #007bff',
-    borderRadius: '8px',
   },
 }

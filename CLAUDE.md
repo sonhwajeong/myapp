@@ -92,6 +92,25 @@ The project uses TypeScript project references for efficient builds:
 - **Entry Point**: Ensure `app.json` specifies `"main": "index.js"`
 - **Metro Cache**: Clear cache with `cd apps/app && npx expo start --clear`
 - **NODE_ENV**: Set environment variable for builds: `NODE_ENV=production`
+- **BuildConfig Import**: If Android build fails with "Unresolved reference 'BuildConfig'", add import:
+  - In `MainActivity.kt` and `MainApplication.kt`: `import com.anonymous.app.BuildConfig`
+- **C++ Standard Issues**: If build fails with C++ errors like "no member named 'bit_width'" or "unknown type name 'concept'":
+  - React Native 0.79.5+ requires C++20 support
+  - Add C++20 support in `apps/app/app.json`:
+  ```json
+  ["expo-build-properties", {
+    "android": {
+      "cppFlags": ["-std=c++20"],
+      "abiFilters": ["arm64-v8a", "armeabi-v7a"]
+    }
+  }]
+  ```
+  - Run `npx expo prebuild --clean` after changes
+  - Re-add BuildConfig imports after prebuild
+- **react-native-maps Compatibility**: If C++ errors persist, temporarily remove react-native-maps:
+  - `npm uninstall react-native-maps`
+  - Rebuild project
+  - Reinstall when React Native updates fix compatibility
 - **Android Gradle Paths**: In `apps/app/android/app/build.gradle`, ensure:
   - `entryFile = file("../index.js")` (not `../../index.js`)
   - `root = file("../")` (not `../../`)
